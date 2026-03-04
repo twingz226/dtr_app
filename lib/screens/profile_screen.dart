@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../database/database_helper.dart';
+import '../main.dart' show themeNotifier, toggleTheme;
 import '../models/student_profile.dart';
 import '../theme/app_theme.dart';
 
@@ -112,22 +113,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        actions: [
-          if (!_editing && _profile != null)
-            TextButton.icon(
-              onPressed: () => setState(() => _editing = true),
-              icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.secondary),
-              label: const Text('Edit', style: TextStyle(color: AppTheme.secondary)),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: _editing ? _buildForm() : _buildView(),
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, mode, _) {
+        final isDark = mode == ThemeMode.dark;
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Profile'),
+            actions: [
+              if (!_editing && _profile != null)
+                TextButton.icon(
+                  onPressed: () => setState(() => _editing = true),
+                  icon: const Icon(Icons.edit_outlined, size: 16, color: AppTheme.secondary),
+                  label: const Text('Edit', style: TextStyle(color: AppTheme.secondary)),
+                ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: IconButton(
+                  tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                  onPressed: toggleTheme,
+                  icon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    transitionBuilder: (child, anim) => RotationTransition(
+                      turns: anim, child: FadeTransition(opacity: anim, child: child)),
+                    child: Icon(
+                      isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                      key: ValueKey(isDark),
+                      color: AppTheme.secondary,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: _editing ? _buildForm() : _buildView(),
+          ),
+        );
+      },
     );
   }
 

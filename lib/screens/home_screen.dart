@@ -80,6 +80,88 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${hrs}h ${mins}m';
   }
 
+  Future<void> _showEditRequiredHoursDialog() async {
+    final ctrl = TextEditingController(text: _requiredHours.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.secondary.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.timer_outlined, color: AppTheme.secondary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text('Required Hours',
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Set the total required OJT hours for your program.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '500',
+                hintStyle: TextStyle(color: AppTheme.textSecondary),
+                suffixText: 'hrs',
+                suffixStyle: TextStyle(color: AppTheme.secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text.trim());
+              if (v != null && v > 0) Navigator.pop(ctx, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result != null) {
+      final profile = _profile;
+      if (profile != null) {
+        final updated = profile.copyWith(requiredHours: result);
+        await _db.updateProfile(updated);
+        await _loadData();
+      } else {
+        // No profile yet — just update local state so the user can see the change
+        setState(() => _requiredHours = result);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -414,7 +496,25 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildProgressStat('Completed', '${_totalHours.toStringAsFixed(1)}h'),
-              _buildProgressStat('Required', '${_requiredHours}h'),
+              GestureDetector(
+                onTap: _showEditRequiredHoursDialog,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.secondary.withOpacity(0.25)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildProgressStat('Required', '${_requiredHours}h'),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.edit_outlined, size: 12, color: AppTheme.secondary),
+                    ],
+                  ),
+                ),
+              ),
               _buildProgressStat('Remaining', '${remaining.toStringAsFixed(1)}h'),
             ],
           ),

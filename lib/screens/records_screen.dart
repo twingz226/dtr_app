@@ -44,6 +44,276 @@ class _RecordsScreenState extends State<RecordsScreen> {
     _loadRecords();
   }
 
+  Future<void> _showAddRecordSheet() async {
+    String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    TimeOfDay? timeIn;
+    TimeOfDay? timeOut;
+    String status = 'present';
+    final remarksCtrl = TextEditingController();
+
+    String formatTOD(TimeOfDay? t) {
+      if (t == null) return '--:--';
+      final h = t.hour.toString().padLeft(2, '0');
+      final m = t.minute.toString().padLeft(2, '0');
+      return DateFormat('hh:mm a').format(DateFormat('HH:mm').parse('$h:$m'));
+    }
+
+    String todTo24(TimeOfDay t) {
+      final h = t.hour.toString().padLeft(2, '0');
+      final m = t.minute.toString().padLeft(2, '0');
+      return '$h:$m:00';
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A2332),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Handle bar
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.divider,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.add_circle_outline, color: AppTheme.secondary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Add Past Record',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 18)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Date Picker Row
+                GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: DateTime.parse(selectedDate),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                      builder: (c, child) => Theme(
+                        data: Theme.of(c).copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: AppTheme.secondary, surface: Color(0xFF1A2332)),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (picked != null) setSheet(() => selectedDate = DateFormat('yyyy-MM-dd').format(picked));
+                  },
+                  child: _sheetTile(
+                    Icons.calendar_today_outlined, 'Date',
+                    DateFormat('MMMM dd, yyyy').format(DateTime.parse(selectedDate)),
+                    AppTheme.secondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Time In / Time Out Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: ctx,
+                            initialTime: timeIn ?? const TimeOfDay(hour: 8, minute: 0),
+                            builder: (c, child) => Theme(
+                              data: Theme.of(c).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: AppTheme.success, surface: Color(0xFF1A2332)),
+                              ),
+                              child: child!,
+                            ),
+                          );
+                          if (t != null) setSheet(() => timeIn = t);
+                        },
+                        child: _sheetTile(Icons.login, 'Time In', formatTOD(timeIn), AppTheme.success),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final t = await showTimePicker(
+                            context: ctx,
+                            initialTime: timeOut ?? const TimeOfDay(hour: 17, minute: 0),
+                            builder: (c, child) => Theme(
+                              data: Theme.of(c).copyWith(
+                                colorScheme: const ColorScheme.dark(
+                                  primary: AppTheme.accent, surface: Color(0xFF1A2332)),
+                              ),
+                              child: child!,
+                            ),
+                          );
+                          if (t != null) setSheet(() => timeOut = t);
+                        },
+                        child: _sheetTile(Icons.logout, 'Time Out', formatTOD(timeOut), AppTheme.accent),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Status Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.divider),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: status,
+                      dropdownColor: AppTheme.cardBg2,
+                      icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textSecondary),
+                      style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                      items: [
+                        _statusItem('present', '✅  Present', AppTheme.success),
+                        _statusItem('absent', '❌  Absent', AppTheme.error),
+                        _statusItem('half-day', '🕐  Half-Day', AppTheme.warning),
+                        _statusItem('leave', '📋  Leave', AppTheme.secondary),
+                      ],
+                      onChanged: (v) { if (v != null) setSheet(() => status = v); },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Remarks
+                TextField(
+                  controller: remarksCtrl,
+                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    labelText: 'Remarks (optional)',
+                    prefixIcon: const Icon(Icons.notes_outlined, size: 18, color: AppTheme.textSecondary),
+                    filled: true,
+                    fillColor: AppTheme.cardBg,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Save Button
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    // Check for duplicate
+                    final existing = await _db.getRecordByDate(selectedDate);
+                    if (existing != null && ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                        content: Text('A record for $selectedDate already exists. Edit it instead.'),
+                        backgroundColor: AppTheme.warning,
+                        behavior: SnackBarBehavior.floating,
+                      ));
+                      return;
+                    }
+                    double? hours;
+                    String? timeInStr;
+                    String? timeOutStr;
+                    if (timeIn != null) timeInStr = todTo24(timeIn!);
+                    if (timeOut != null) {
+                      timeOutStr = todTo24(timeOut!);
+                      if (timeIn != null) {
+                        final inMin = timeIn!.hour * 60 + timeIn!.minute;
+                        final outMin = timeOut!.hour * 60 + timeOut!.minute;
+                        hours = (outMin - inMin) / 60.0;
+                        if (hours < 0) hours += 24; // overnight shift
+                      }
+                    }
+                    final record = DtrRecord(
+                      date: selectedDate,
+                      timeIn: timeInStr,
+                      timeOut: timeOutStr,
+                      hoursWorked: hours,
+                      status: status,
+                      remarks: remarksCtrl.text.trim().isEmpty ? null : remarksCtrl.text.trim(),
+                    );
+                    await _db.insertRecord(record);
+                    await _loadRecords();
+                    remarksCtrl.dispose();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Record added for ${DateFormat('MMM dd, yyyy').format(DateTime.parse(selectedDate))}'),
+                        backgroundColor: AppTheme.success,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ));
+                    }
+                  },
+                  icon: const Icon(Icons.save_outlined, size: 18),
+                  label: const Text('Save Record'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sheetTile(IconData icon, String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+              Text(value, style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const Spacer(),
+          Icon(Icons.chevron_right, size: 16, color: color.withOpacity(0.6)),
+        ],
+      ),
+    );
+  }
+
+  DropdownMenuItem<String> _statusItem(String value, String label, Color color) {
+    return DropdownMenuItem(value: value, child: Text(label, style: TextStyle(color: color)));
+  }
+
   Future<void> _showEditDialog(DtrRecord record) async {
     final remarksCtrl = TextEditingController(text: record.remarks ?? '');
     String? newStatus = record.status;
@@ -129,6 +399,13 @@ class _RecordsScreenState extends State<RecordsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddRecordSheet,
+        backgroundColor: AppTheme.secondary,
+        foregroundColor: AppTheme.primary,
+        icon: const Icon(Icons.add),
+        label: Text('Add Record', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
+      ),
       appBar: AppBar(
         title: const Text('DTR Records'),
         actions: [

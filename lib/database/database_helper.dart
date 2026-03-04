@@ -88,7 +88,7 @@ class DatabaseHelper {
     final all = await getAllRecords();
     return all
         .where((r) => r.status == 'present')
-        .fold(0.0, (sum, r) => sum + (r.hoursWorked ?? 0));
+        .fold<double>(0.0, (sum, r) => sum + (r.hoursWorked ?? 0));
   }
 
   Future<int> deleteRecord(int id) async {

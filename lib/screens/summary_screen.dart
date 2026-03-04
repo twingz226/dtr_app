@@ -36,6 +36,86 @@ class _SummaryScreenState extends State<SummaryScreen> {
     });
   }
 
+  Future<void> _showEditRequiredHoursDialog() async {
+    final ctrl = TextEditingController(text: _requiredHours.toString());
+    final result = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2332),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.secondary.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.timer_outlined, color: AppTheme.secondary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text('Required Hours',
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Set the total required OJT hours for your program.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppTheme.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '500',
+                hintStyle: TextStyle(color: AppTheme.textSecondary),
+                suffixText: 'hrs',
+                suffixStyle: TextStyle(color: AppTheme.secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text.trim());
+              if (v != null && v > 0) Navigator.pop(ctx, v);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (result != null) {
+      final profile = await _db.getProfile();
+      if (profile != null) {
+        await _db.updateProfile(profile.copyWith(requiredHours: result));
+        await _loadData();
+      } else {
+        setState(() => _requiredHours = result);
+      }
+    }
+  }
+
   List<DtrRecord> _getThisWeekRecords() {
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
@@ -166,7 +246,27 @@ class _SummaryScreenState extends State<SummaryScreen> {
                   color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 16)),
                 const SizedBox(height: 8),
                 _buildProgressRow('Completed', '${_totalHours.toStringAsFixed(1)}h', AppTheme.secondary),
-                _buildProgressRow('Required', '${_requiredHours}h', AppTheme.textSecondary),
+                GestureDetector(
+                  onTap: _showEditRequiredHoursDialog,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Required', style: TextStyle(color: AppTheme.textSecondary, fontSize: 12)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${_requiredHours}h',
+                              style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.edit_outlined, size: 11, color: AppTheme.secondary),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 _buildProgressRow('Remaining', '${(_requiredHours - _totalHours).clamp(0, double.infinity).toStringAsFixed(1)}h', AppTheme.accent),
               ],
             ),
