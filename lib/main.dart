@@ -7,68 +7,29 @@ import 'screens/summary_screen.dart';
 import 'screens/profile_screen.dart';
 import 'theme/app_theme.dart';
 
-/// Global notifier so any screen can read/toggle the current theme mode.
-final themeNotifier = ValueNotifier<ThemeMode>(ThemeMode.dark);
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-
-  // Load persisted theme preference
-  final settingsBox = await Hive.openBox('settings');
-  final savedTheme = settingsBox.get('themeMode', defaultValue: 'dark') as String;
-  themeNotifier.value = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
-
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+  ));
   runApp(const DTRApp());
 }
 
-class DTRApp extends StatefulWidget {
+class DTRApp extends StatelessWidget {
   const DTRApp({super.key});
-  @override
-  State<DTRApp> createState() => _DTRAppState();
-}
-
-class _DTRAppState extends State<DTRApp> {
-  @override
-  void initState() {
-    super.initState();
-    themeNotifier.addListener(_onThemeChanged);
-  }
-
-  void _onThemeChanged() => setState(() {});
-
-  @override
-  void dispose() {
-    themeNotifier.removeListener(_onThemeChanged);
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = themeNotifier.value == ThemeMode.dark;
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-    ));
     return MaterialApp(
       title: 'OJT Daily Time Record',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeNotifier.value,
+      theme: AppTheme.darkTheme,
       home: const MainNavigation(),
     );
   }
-}
-
-/// Toggles theme and persists the choice to Hive.
-Future<void> toggleTheme() async {
-  themeNotifier.value = themeNotifier.value == ThemeMode.dark
-      ? ThemeMode.light
-      : ThemeMode.dark;
-  final box = await Hive.openBox('settings');
-  await box.put('themeMode', themeNotifier.value == ThemeMode.light ? 'light' : 'dark');
 }
 
 class MainNavigation extends StatefulWidget {
@@ -89,14 +50,14 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = themeNotifier.value == ThemeMode.dark;
-    final dividerColor = isDark ? AppTheme.divider : AppTheme.lightDivider;
-
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: dividerColor, width: 1)),
+          border: Border(top: BorderSide(color: AppTheme.divider, width: 1)),
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
