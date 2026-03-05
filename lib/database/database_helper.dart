@@ -43,24 +43,43 @@ class DatabaseHelper {
 
   // ── DTR Records CRUD ────────────────────────────────────────────────────────
 
-  /// Insert or replace a record keyed by its date string (yyyy-MM-dd)
+  /// Insert a record and return its id
   Future<int> insertRecord(DtrRecord record) async {
     final box = await _records;
-    await box.put(record.date, record.toMap());
-    return 1;
+    // If record doesn't have an ID, generate one
+    final idForRecord = record.id ?? DateTime.now().millisecondsSinceEpoch;
+    final updatedRecord = record.copyWith(id: idForRecord);
+    await box.put(idForRecord.toString(), updatedRecord.toMap());
+    return idForRecord;
   }
 
   Future<int> updateRecord(DtrRecord record) async {
+    if (record.id == null) return 0;
     final box = await _records;
-    await box.put(record.date, record.toMap());
+    await box.put(record.id.toString(), record.toMap());
     return 1;
   }
 
-  Future<DtrRecord?> getRecordByDate(String date) async {
+  /// Get the latest record for a specific date that isn't clocked out yet
+  Future<DtrRecord?> getActiveRecordByDate(String date) async {
     final box = await _records;
-    final raw = box.get(date);
-    if (raw == null) return null;
-    return DtrRecord.fromMap(Map<String, dynamic>.from(raw as Map));
+    final records = box.values
+        .map((e) => DtrRecord.fromMap(Map<String, dynamic>.from(e as Map)))
+        .where((r) => r.date == date && r.timeOut == null)
+        .toList();
+    
+    if (records.isEmpty) return null;
+    // Return latest active one
+    return records.last;
+  }
+
+  /// Get all records for a specific date
+  Future<List<DtrRecord>> getRecordsByDate(String date) async {
+    final box = await _records;
+    return box.values
+        .map((e) => DtrRecord.fromMap(Map<String, dynamic>.from(e as Map)))
+        .where((r) => r.date == date)
+        .toList();
   }
 
   Future<List<DtrRecord>> getAllRecords() async {
@@ -68,50 +87,70 @@ class DatabaseHelper {
     final list = box.values
         .map((e) => DtrRecord.fromMap(Map<String, dynamic>.from(e as Map)))
         .toList();
-    // Sort descending by date
-    list.sort((a, b) => b.date.compareTo(a.date));
+    // Sort descending by date, then by timeIn
+    list.sort((a, b) {
+      int dateComp = b.date.compareTo(a.date);
+      if (dateComp != 0) return dateComp;
+      return (b.timeIn ?? '').compareTo(a.timeIn ?? '');
+    });
     return list;
   }
 
   Future<List<DtrRecord>> getRecordsByMonth(int year, int month) async {
     final prefix = '$year-${month.toString().padLeft(2, '0')}';
     final box = await _records;
-    final list = box.keys
-        .where((k) => (k as String).startsWith(prefix))
-        .map((k) => DtrRecord.fromMap(Map<String, dynamic>.from(box.get(k) as Map)))
+    final list = box.values
+        .map((e) => DtrRecord.fromMap(Map<String, dynamic>.from(e as Map)))
+        .where((r) => r.date.startsWith(prefix))
         .toList();
-    list.sort((a, b) => a.date.compareTo(b.date));
+    
+    list.sort((a, b) {
+      int dateComp = a.date.compareTo(b.date);
+      if (dateComp != 0) return dateComp;
+      return (a.timeIn ?? '').compareTo(b.timeIn ?? '');
+    });
     return list;
   }
 
   Future<double> getTotalHours() async {
     final all = await getAllRecords();
     return all
-        .where((r) => r.status == 'present')
+        .where((r) => r.status == 'present' || r.status == 'half-day')
         .fold<double>(0.0, (sum, r) => sum + (r.hoursWorked ?? 0));
   }
 
   Future<int> deleteRecord(int id) async {
-    // Hive uses date as key — find by matching id field
     final box = await _records;
-    String? targetKey;
-    for (final key in box.keys) {
-      final raw = Map<String, dynamic>.from(box.get(key) as Map);
-      if (raw['id'] == id) {
-        targetKey = key as String;
+    if (box.containsKey(id.toString())) {
+      await box.delete(id.toString());
+      return 1;
+    }
+    // Fallback for old records where key might be the date
+    String? keyToRemove;
+    for (var key in box.keys) {
+      final raw = box.get(key);
+      if (raw != null && Map<String, dynamic>.from(raw as Map)['id'] == id) {
+        keyToRemove = key as String;
         break;
       }
     }
-    if (targetKey != null) {
-      await box.delete(targetKey);
+    if (keyToRemove != null) {
+      await box.delete(keyToRemove);
       return 1;
     }
     return 0;
   }
 
-  /// Delete by date (more efficient since date is the key)
-  Future<void> deleteRecordByDate(String date) async {
+  /// Delete all records for a date (legacy support/utility)
+  Future<void> deleteRecordsByDate(String date) async {
     final box = await _records;
-    await box.delete(date);
+    final keysToDelete = box.keys.where((k) {
+      final record = DtrRecord.fromMap(Map<String, dynamic>.from(box.get(k) as Map));
+      return record.date == date;
+    }).toList();
+
+    for (var key in keysToDelete) {
+      await box.delete(key);
+    }
   }
 }

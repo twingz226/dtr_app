@@ -34,13 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     final profile = await _db.getProfile();
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final todayRecord = await _db.getRecordByDate(today);
+    // Get the latest active record (not clocked out yet)
+    final activeRecord = await _db.getActiveRecordByDate(today);
     final total = await _db.getTotalHours();
     final all = await _db.getAllRecords();
 
     setState(() {
       _profile = profile;
-      _todayRecord = todayRecord;
+      _todayRecord = activeRecord;
       _totalHours = total;
       _requiredHours = profile?.requiredHours ?? 500;
       _recentRecords = all.take(5).toList();
@@ -54,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final timeStr = DateFormat('HH:mm:ss').format(now);
 
     if (_todayRecord == null) {
-      // Clock In
+      // Clock In (either first time today or starting a new shift)
       final record = DtrRecord(date: today, timeIn: timeStr, status: 'present');
       final id = await _db.insertRecord(record);
       setState(() => _todayRecord = record.copyWith(id: id));
@@ -67,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final updated = _todayRecord!.copyWith(timeOut: timeStr, hoursWorked: hours);
       await _db.updateRecord(updated);
-      setState(() => _todayRecord = updated);
+      setState(() => _todayRecord = null); // Reset so it can show "Clock In" again for next shift
     }
 
     await _loadData();

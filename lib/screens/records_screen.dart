@@ -225,16 +225,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
                 // Save Button
                 ElevatedButton.icon(
                   onPressed: () async {
-                    // Check for duplicate
-                    final existing = await _db.getRecordByDate(selectedDate);
-                    if (existing != null && ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                        content: Text('A record for $selectedDate already exists. Edit it instead.'),
-                        backgroundColor: AppTheme.warning,
-                        behavior: SnackBarBehavior.floating,
-                      ));
-                      return;
-                    }
                     double? hours;
                     String? timeInStr;
                     String? timeOutStr;
@@ -385,7 +375,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
       ),
     );
     if (confirm == true) {
-      await _db.deleteRecordByDate(record.date);
+      await _db.deleteRecord(record.id!);
       await _loadRecords();
     }
   }
@@ -394,7 +384,7 @@ class _RecordsScreenState extends State<RecordsScreen> {
     _records.fold(0, (sum, r) => sum + (r.hoursWorked ?? 0));
 
   int get _presentDays =>
-    _records.where((r) => r.status == 'present').length;
+    _records.where((r) => r.status == 'present').map((r) => r.date).toSet().length;
 
   @override
   Widget build(BuildContext context) {
